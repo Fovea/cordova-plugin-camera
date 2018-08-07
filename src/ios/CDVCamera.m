@@ -549,7 +549,8 @@ static NSString* toBase64(NSData* data) {
         cameraPicker.pickerPopoverController = nil;
         invoke();
     } else {
-        [[cameraPicker presentingViewController] dismissViewControllerAnimated:YES completion:invoke];
+        // [[cameraPicker presentingViewController] dismissViewControllerAnimated:YES completion:invoke];
+        invoke();
     }
 }
 
@@ -730,17 +731,21 @@ static NSString* toBase64(NSData* data) {
 // (one or both images will be nil)).
 //
 // param originalImage: Orginal image from camera/gallery
-//
 // param croppedImage: Cropped image in cropRatio aspect ratio
-//
 - (void)didCropImage:(UIImage * _Nullable)originalImage croppedImage:(UIImage * _Nullable)croppedImage {
   NSLog(@"didCropImage");
+  NSMutableDictionary* imageInfo = [[NSMutableDictionary alloc] init];
+  [imageInfo setObject:croppedImage forKey:UIImagePickerControllerEditedImage];
+  [imageInfo setObject:originalImage forKey:UIImagePickerControllerOriginalImage];
+  [imageInfo setObject:(NSString*)kUTTypeImage forKey:UIImagePickerControllerMediaType];
+  [self imagePickerController:self.pickerController didFinishPickingMediaWithInfo:imageInfo];
 }
 
 /// (optional) Called when user cancels the picker.
 /// If method is not available picker is dismissed.
 - (void)didCancel {
   NSLog(@"didCancel");
+  [self imagePickerControllerDidCancel:self.pickerController];
 }
 
 @end
