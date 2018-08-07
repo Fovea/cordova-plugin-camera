@@ -104,7 +104,7 @@ static NSString* toBase64(NSData* data) {
     org_apache_cordova_validArrowDirections = [[NSSet alloc] initWithObjects:[NSNumber numberWithInt:UIPopoverArrowDirectionUp], [NSNumber numberWithInt:UIPopoverArrowDirectionDown], [NSNumber numberWithInt:UIPopoverArrowDirectionLeft], [NSNumber numberWithInt:UIPopoverArrowDirectionRight], [NSNumber numberWithInt:UIPopoverArrowDirectionAny], nil];
 }
 
-@synthesize hasPendingOperation, pickerController, locationManager;
+@synthesize hasPendingOperation, pickerController, cropperController, locationManager;
 
 - (NSURL*) urlTransformer:(NSURL*)url
 {
@@ -182,10 +182,13 @@ static NSString* toBase64(NSData* data) {
             }
         }
 
-        CDVCameraPicker* cameraPicker = [CDVCameraPicker createFromPictureOptions:pictureOptions];
-        weakSelf.pickerController = cameraPicker;
+        [CDVCameraPicker createFromPictureOptions:pictureOptions intoCamera:weakSelf];
+        CDVCameraPicker* cameraPicker = weakSelf.pickerController;
+        UIImageCropper* imageCropper = weakSelf.cropperController;
 
-        cameraPicker.delegate = weakSelf;
+        // cameraPicker.delegate = weakSelf;
+        imageCropper.delegate = weakSelf;
+        imageCropper.picker = cameraPicker;
         cameraPicker.callbackId = command.callbackId;
         // we need to capture this state for memory warnings that dealloc this object
         cameraPicker.webView = weakSelf.webView;
@@ -723,6 +726,23 @@ static NSString* toBase64(NSData* data) {
     }
 }
 
+// Called when user presses crop button (or when there is unknown situation
+// (one or both images will be nil)).
+//
+// param originalImage: Orginal image from camera/gallery
+//
+// param croppedImage: Cropped image in cropRatio aspect ratio
+//
+- (void)didCropImage:(UIImage * _Nullable)originalImage croppedImage:(UIImage * _Nullable)croppedImage {
+  NSLog(@"didCropImage");
+}
+
+/// (optional) Called when user cancels the picker.
+/// If method is not available picker is dismissed.
+- (void)didCancel {
+  NSLog(@"didCancel");
+}
+
 @end
 
 @implementation CDVCameraPicker
@@ -747,12 +767,17 @@ static NSString* toBase64(NSData* data) {
     [super viewWillAppear:animated];
 }
 
-+ (instancetype) createFromPictureOptions:(CDVPictureOptions*)pictureOptions;
++ (void) createFromPictureOptions:(CDVPictureOptions*)pictureOptions intoCamera:(__weak id)icamera
 {
+    __weak CDVCamera *camera = icamera;
     CDVCameraPicker* cameraPicker = [[CDVCameraPicker alloc] init];
+    UIImageCropper *imageCropper = [[UIImageCropper alloc] init];
+    imageCropper.cropRatio = 1/1;
+    // imageCropper.autoClosePicker = NO;
+
     cameraPicker.pictureOptions = pictureOptions;
     cameraPicker.sourceType = pictureOptions.sourceType;
-    cameraPicker.allowsEditing = pictureOptions.allowsEditing;
+    // cameraPicker.allowsEditing = pictureOptions.allowsEditing;
 
     if (cameraPicker.sourceType == UIImagePickerControllerSourceTypeCamera) {
         // We only allow taking pictures (no video) in this API.
@@ -766,7 +791,9 @@ static NSString* toBase64(NSData* data) {
         cameraPicker.mediaTypes = mediaArray;
     }
 
-    return cameraPicker;
+    camera.pickerController = cameraPicker;
+    camera.cropperController = imageCropper;
+    // return cameraPicker;
 }
 
 @end
