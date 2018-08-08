@@ -26,10 +26,12 @@ import UIKit
                              UIImagePickerControllerDelegate,
                              UINavigationControllerDelegate {
     
-    /// Aspect ratio of the cropped image
+    /// Aspect ratio of the cropped image (width / height)
     @objc open var cropRatio: CGFloat = 1
+
     /// delegate that implements UIImageCropperProtocol
     @objc open weak var delegate: UIImageCropperProtocol?
+
     /// UIImagePickerController picker
     @objc open weak var picker: UIImagePickerController? {
         didSet {
@@ -50,7 +52,7 @@ import UIKit
                 return
             }
             layoutDone = false
-            ratio = image.size.height / image.size.width
+            imageRatio = image.size.height / image.size.width
             imageView.image = image
             self.view.layoutIfNeeded()
         }
@@ -64,24 +66,30 @@ import UIKit
     /// When false parent needs to close picker.
     @objc open var autoClosePicker: Bool = true
 
+    // topView is the root view containing imageView, cropView and fadeView
     fileprivate let topView = UIView()
+    // fadeView is a translucent black view. It "fades" whatever is outside the
+    // cropping rectangle.. func maskFadeView() is used to mask it.
     fileprivate let fadeView = UIView()
+    // contains the image. pinch/pan events are attached to this view.
+    // see pinch() and pan()
     fileprivate let imageView: UIImageView = UIImageView()
+    // a square that shows the crop area
     fileprivate let cropView: UIView = UIView()
 
-    fileprivate var topConst: NSLayoutConstraint?
-    fileprivate var leadConst: NSLayoutConstraint?
+    // fileprivate var topConst: NSLayoutConstraint?
+    // fileprivate var leadConst: NSLayoutConstraint?
+    // fileprivate var imageHeightConst: NSLayoutConstraint?
+    // fileprivate var imageWidthConst: NSLayoutConstraint?
 
-    fileprivate var imageHeightConst: NSLayoutConstraint?
-    fileprivate var imageWidthConst: NSLayoutConstraint?
-
-    fileprivate var ratio: CGFloat = 1
+    fileprivate var imageRatio: CGFloat = 1
     fileprivate var layoutDone: Bool = false
     
-    fileprivate var orgHeight: CGFloat = 0
-    fileprivate var orgWidth: CGFloat = 0
-    fileprivate var topStart: CGFloat = 0
-    fileprivate var leadStart: CGFloat = 0
+    fileprivate var initialState: CGRect = CGRect(x:0, y:0, width:0, height:0)
+    // initialHeight: CGFloat = 0
+    // fileprivate var initialWidth: CGFloat = 0
+    // fileprivate var initialX: CGFloat = 0
+    // fileprivate var initialY: CGFloat = 0
     fileprivate var pinchStart: CGPoint = .zero
     
     fileprivate let cropButton = UIButton(type: .custom)
@@ -108,18 +116,7 @@ import UIKit
 
         // image view
         imageView.contentMode = .scaleAspectFit
-        imageView.translatesAutoresizingMaskIntoConstraints = false
         topView.addSubview(imageView)
-        topConst = NSLayoutConstraint(item: imageView, attribute: .top, relatedBy: .equal, toItem: topView, attribute: .top, multiplier: 1, constant: 0)
-        topConst?.priority = UILayoutPriority.defaultHigh
-        leadConst = NSLayoutConstraint(item: imageView, attribute: .leading, relatedBy: .equal, toItem: topView, attribute: .leading, multiplier: 1, constant: 0)
-        leadConst?.priority = UILayoutPriority.defaultHigh
-        imageWidthConst = NSLayoutConstraint(item: imageView, attribute: .width, relatedBy: .equal, toItem: nil, attribute: .width, multiplier: 1, constant: 1)
-        imageWidthConst?.priority = UILayoutPriority.required
-        imageHeightConst = NSLayoutConstraint(item: imageView, attribute: .height, relatedBy: .equal, toItem: nil, attribute: .height, multiplier: 1, constant: 1)
-        imageHeightConst?.priority = UILayoutPriority.required
-        imageView.addConstraints([imageHeightConst!, imageWidthConst!])
-        topView.addConstraints([topConst!, leadConst!])
         imageView.image = self.image
 
         // imageView gestures
@@ -142,6 +139,12 @@ import UIKit
         cropView.translatesAutoresizingMaskIntoConstraints = false
         cropView.isUserInteractionEnabled = false
         topView.addSubview(cropView)
+        // constraints:
+        //  * cropView.centerX = topView.centerX
+        //  * cropView.centerY = topView.centerY
+        //  * cropView.width = topView.width * 0.9
+        //  * cropView.height <= topView.height * 0.9
+        //  * cropView.width = cropView.height * cropRatio
         let centerXConst = NSLayoutConstraint(item: cropView, attribute: .centerX, relatedBy: .equal, toItem: topView, attribute: .centerX, multiplier: 1, constant: 0)
         let centerYConst = NSLayoutConstraint(item: cropView, attribute: .centerY, relatedBy: .equal, toItem: topView, attribute: .centerY, multiplier: 1, constant: 0)
         let widthConst = NSLayoutConstraint(item: cropView, attribute: .width, relatedBy: .equal, toItem: topView, attribute: .width, multiplier: 0.9, constant: 0)
@@ -197,21 +200,20 @@ import UIKit
         }
         layoutDone = true
 
-        if ratio < 1 {
-            imageWidthConst?.constant = cropView.frame.height / ratio
-            imageHeightConst?.constant = cropView.frame.height
+        var width: CGFloat
+        var height: CGFloat
+        if imageRatio < cropRatio {
+            width = cropView.frame.height / imageRatio
+            height = cropView.frame.height
         } else {
-            imageWidthConst?.constant = cropView.frame.width
-            imageHeightConst?.constant = cropView.frame.width * ratio
+            width = cropView.frame.width
+            height = cropView.frame.width * imageRatio
         }
+        let x = cropView.frame.origin.x + cropView.frame.width * 0.5 - width * 0.5
+        let y = cropView.frame.origin.y + cropView.frame.height * 0.5 - height * 0.5
+        imageView.frame = CGRect(x:x, y:y, width:width, height:height)
 
-        let horizontal = NSLayoutConstraint.constraints(withVisualFormat: "H:|-(<=\(cropView.frame.origin.x))-[view]-(<=\(cropView.frame.origin.x))-|", options: NSLayoutFormatOptions(), metrics: nil, views: ["view": imageView])
-        let vertical = NSLayoutConstraint.constraints(withVisualFormat: "V:|-(<=\(cropView.frame.origin.y))-[view]-(<=\(cropView.frame.origin.y))-|", options: NSLayoutFormatOptions(), metrics: nil, views: ["view": imageView])
-        topView.addConstraints(horizontal + vertical)
-        
         maskFadeView()
-        orgWidth = imageWidthConst!.constant
-        orgHeight = imageHeightConst!.constant
     }
     
     fileprivate func maskFadeView() {
@@ -255,28 +257,53 @@ import UIKit
         }
     }
 
+    func setImageFrame(frame: CGRect) {
+        var x = frame.origin.x
+        var y = frame.origin.y
+        let width = frame.size.width
+        let height = frame.size.height
+        if frame.minX > cropView.frame.minX {
+            x += cropView.frame.minX - frame.minX
+        }
+        if frame.maxX < cropView.frame.maxX {
+            x += cropView.frame.maxX - frame.maxX
+        }
+        if frame.minY > cropView.frame.minY {
+            y += cropView.frame.minY - frame.minY
+        }
+        if frame.maxY < cropView.frame.maxY {
+            y += cropView.frame.maxY - frame.maxY
+        }
+        imageView.frame = CGRect(x: x, y: y, width: width, height: height)
+    }
+
     //MARK: - gesture handling
     @objc func pinch(_ pinch: UIPinchGestureRecognizer) {
         if pinch.state == .began {
-            orgWidth = imageWidthConst!.constant
-            orgHeight = imageHeightConst!.constant
+            initialState = imageView.frame
             pinchStart = pinch.location(in: self.view)
         }
-        let scale = pinch.scale
-        let height = max(orgHeight * scale, cropView.frame.height)
-        let width = max(orgWidth * scale, cropView.frame.height / ratio)
-        imageHeightConst?.constant = height
-        imageWidthConst?.constant = width
+        var scale = pinch.scale
+        if initialState.width * scale < cropView.frame.width {
+            scale = cropView.frame.width / initialState.width
+        }
+        if initialState.height * scale < cropView.frame.height {
+            scale = cropView.frame.height / initialState.height
+        }
+        if scale > 2 {
+            scale = 2
+        }
+        let transform = CGAffineTransform(translationX: (1-scale) * pinchStart.x, y: (1-scale) * pinchStart.y)
+            .scaledBy(x: scale, y: scale)
+        setImageFrame(frame: initialState.applying(transform))
     }
     
     @objc func pan(_ pan: UIPanGestureRecognizer) {
         if pan.state == .began {
-            topStart = topConst!.constant
-            leadStart = leadConst!.constant
+            initialState = imageView.frame
         }
         let trans = pan.translation(in: self.view)
-        leadConst?.constant = leadStart + trans.x
-        topConst?.constant = topStart + trans.y
+        setImageFrame(frame: initialState.offsetBy(dx: trans.x, dy: trans.y))
     }
 
     //MARK: - cropping done here
