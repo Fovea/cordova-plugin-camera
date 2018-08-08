@@ -215,7 +215,7 @@ import UIKit
 
         // control buttons
         var cropCenterXMultiplier: CGFloat = 1.0
-        // if picker?.sourceType != .camera { //hide retake/cancel when using camera as camera has its own preview
+        if picker?.sourceType != .camera { //hide retake/cancel when using camera as camera has its own preview
             cancelButton.translatesAutoresizingMaskIntoConstraints = false
             cancelButton.setTitle(cancelButtonText, for: .normal)
             cancelButton.addTarget(self, action: #selector(cropCancel), for: .touchUpInside)
@@ -224,7 +224,7 @@ import UIKit
             let centerCancelYConst = NSLayoutConstraint(item: cancelButton, attribute: .centerY, relatedBy: .equal, toItem: bottomView, attribute: .centerY, multiplier: 1, constant: 0)
             bottomView.addConstraints([centerCancelXConst, centerCancelYConst])
             cropCenterXMultiplier = 1.5
-        // }
+        }
         cropButton.translatesAutoresizingMaskIntoConstraints = false
         cropButton.addTarget(self, action: #selector(cropDone), for: .touchUpInside)
         bottomView.addSubview(cropButton)
