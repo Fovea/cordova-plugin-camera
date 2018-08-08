@@ -37,11 +37,67 @@ import UIKit
         didSet {
             picker?.delegate = self
             picker?.allowsEditing = false
+            // picker?.showsCameraControls = false
         }
+    }
+    
+    func allImageViewsSubViews(view: UIView?, into: inout [UIImageView]) {
+        
+        if view == nil {
+            return
+        }
+
+        if view! is UIImageView {
+            into.append(view! as! UIImageView)
+        }
+        else {
+            for subview: UIView in view!.subviews {
+                allImageViewsSubViews(view: subview, into: &into)
+            }
+        }
+    }
+    
+    fileprivate func setupObserver() {
+        NotificationCenter.default.addObserver(forName: Notification.Name("_UIImagePickerControllerUserDidCaptureItem"),
+                                               object: nil, queue: nil)
+        {
+            _ in
+            var images: [UIImageView] = []
+            if self.picker?.view != nil {
+                self.allImageViewsSubViews(view: self.picker?.viewControllers.first?.view, into: &images)
+                // self.picker?.view!.isHidden = true
+            }
+            let img: UIImage? = images.last?.image
+            if img != nil {
+                var dict: [String: Any] = [:]
+                dict[UIImagePickerControllerOriginalImage] = img
+                self.imagePickerController(self.picker!, didFinishPickingMediaWithInfo: dict)
+            }
+//            else {
+//                self.picker?.dismiss(animated: true, completion: nil)
+//            }
+            // overlayView.isHidden = true
+            // overlayView.isUserInteractionEnabled = false
+        }
+//        NotificationCenter.default.addObserver(forName: Notification.Name("_UIImagePickerControllerUserDidRejectItem"),
+//                                               object: nil, queue: nil)
+//        {
+//            _ in
+//            self.picker?.view?.isHidden = false
+//            // overlayView.isUserInteractionEnabled = true
+//        }
+    }
+    public override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
+        super.init(nibName:nibNameOrNil, bundle:nibBundleOrNil)
+        setupObserver()
+    }
+    public required init?(coder aDecoder: NSCoder) {
+        super.init(coder: aDecoder)
+        setupObserver()
     }
 
     /// Crop button text
-    @objc open var cropButtonText: String = "Crop"
+    @objc open var cropButtonText: String = "Use Photo"
     /// Retake/Cancel button text
     @objc open var cancelButtonText: String = "Retake"
 
@@ -159,7 +215,7 @@ import UIKit
 
         // control buttons
         var cropCenterXMultiplier: CGFloat = 1.0
-        if picker?.sourceType != .camera { //hide retake/cancel when using camera as camera has its own preview
+        // if picker?.sourceType != .camera { //hide retake/cancel when using camera as camera has its own preview
             cancelButton.translatesAutoresizingMaskIntoConstraints = false
             cancelButton.setTitle(cancelButtonText, for: .normal)
             cancelButton.addTarget(self, action: #selector(cropCancel), for: .touchUpInside)
@@ -168,7 +224,7 @@ import UIKit
             let centerCancelYConst = NSLayoutConstraint(item: cancelButton, attribute: .centerY, relatedBy: .equal, toItem: bottomView, attribute: .centerY, multiplier: 1, constant: 0)
             bottomView.addConstraints([centerCancelXConst, centerCancelYConst])
             cropCenterXMultiplier = 1.5
-        }
+        // }
         cropButton.translatesAutoresizingMaskIntoConstraints = false
         cropButton.addTarget(self, action: #selector(cropDone), for: .touchUpInside)
         bottomView.addSubview(cropButton)
@@ -184,7 +240,7 @@ import UIKit
     
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        
+
         self.cancelButton.setTitle(cancelButtonText, for: .normal)
         self.cropButton.setTitle(cropButtonText, for: .normal)
         
@@ -367,3 +423,4 @@ extension UIView {
         self.centerYAnchor.constraint(equalTo: view.centerYAnchor).isActive = true
     }
 }
+
