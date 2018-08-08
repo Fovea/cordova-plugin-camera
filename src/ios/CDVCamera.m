@@ -186,9 +186,13 @@ static NSString* toBase64(NSData* data) {
         CDVCameraPicker* cameraPicker = weakSelf.pickerController;
         UIImageCropper* imageCropper = weakSelf.cropperController;
 
-        // cameraPicker.delegate = weakSelf;
-        imageCropper.delegate = weakSelf;
-        imageCropper.picker = cameraPicker;
+        if (imageCropper) {
+            imageCropper.delegate = weakSelf;
+            imageCropper.picker = cameraPicker;
+        }
+        else {
+            cameraPicker.delegate = weakSelf;
+        }
         cameraPicker.callbackId = command.callbackId;
         // we need to capture this state for memory warnings that dealloc this object
         cameraPicker.webView = weakSelf.webView;
@@ -582,6 +586,7 @@ static NSString* toBase64(NSData* data) {
 
         weakSelf.hasPendingOperation = NO;
         weakSelf.pickerController = nil;
+        weakSelf.cropperController = nil;
     };
 
     [[cameraPicker presentingViewController] dismissViewControllerAnimated:YES completion:invoke];
@@ -776,12 +781,10 @@ static NSString* toBase64(NSData* data) {
 {
     __weak CDVCamera *camera = icamera;
     CDVCameraPicker* cameraPicker = [[CDVCameraPicker alloc] init];
-    UIImageCropper *imageCropper = [[UIImageCropper alloc] init];
-    imageCropper.cropRatio = 1/1;
-    // imageCropper.autoClosePicker = NO;
 
     cameraPicker.pictureOptions = pictureOptions;
     cameraPicker.sourceType = pictureOptions.sourceType;
+    // Editing is now handled by the UIImageCropper
     // cameraPicker.allowsEditing = pictureOptions.allowsEditing;
 
     if (cameraPicker.sourceType == UIImagePickerControllerSourceTypeCamera) {
@@ -796,9 +799,17 @@ static NSString* toBase64(NSData* data) {
         cameraPicker.mediaTypes = mediaArray;
     }
 
+    if (pictureOptions.allowsEditing) {
+        UIImageCropper *imageCropper = [[UIImageCropper alloc] init];
+        if (pictureOptions.targetSize.width > 0 && pictureOptions.targetSize.height > 0) {
+          imageCropper.cropRatio = pictureOptions.targetSize.width / pictureOptions.targetSize.height;
+        }
+        camera.cropperController = imageCropper;
+    }
+    else {
+        camera.cropperController = nil;
+    }
     camera.pickerController = cameraPicker;
-    camera.cropperController = imageCropper;
-    // return cameraPicker;
 }
 
 @end

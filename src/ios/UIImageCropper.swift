@@ -98,8 +98,9 @@ import UIKit
 
     /// Crop button text
     @objc open var cropButtonText: String = "Use Photo"
+
     /// Retake/Cancel button text
-    @objc open var cancelButtonText: String = "Retake"
+    @objc open var cancelButtonText: String = "Cancel"
 
     /// original image from camera or gallery
     @objc open var image: UIImage? {
@@ -133,19 +134,10 @@ import UIKit
     // a square that shows the crop area
     fileprivate let cropView: UIView = UIView()
 
-    // fileprivate var topConst: NSLayoutConstraint?
-    // fileprivate var leadConst: NSLayoutConstraint?
-    // fileprivate var imageHeightConst: NSLayoutConstraint?
-    // fileprivate var imageWidthConst: NSLayoutConstraint?
-
     fileprivate var imageRatio: CGFloat = 1
     fileprivate var layoutDone: Bool = false
     
     fileprivate var initialState: CGRect = CGRect(x:0, y:0, width:0, height:0)
-    // initialHeight: CGFloat = 0
-    // fileprivate var initialWidth: CGFloat = 0
-    // fileprivate var initialX: CGFloat = 0
-    // fileprivate var initialY: CGFloat = 0
     fileprivate var pinchStart: CGPoint = .zero
     
     fileprivate let cropButton = UIButton(type: .custom)
@@ -215,16 +207,15 @@ import UIKit
 
         // control buttons
         var cropCenterXMultiplier: CGFloat = 1.0
-        if picker?.sourceType != .camera { //hide retake/cancel when using camera as camera has its own preview
-            cancelButton.translatesAutoresizingMaskIntoConstraints = false
-            cancelButton.setTitle(cancelButtonText, for: .normal)
-            cancelButton.addTarget(self, action: #selector(cropCancel), for: .touchUpInside)
-            bottomView.addSubview(cancelButton)
-            let centerCancelXConst = NSLayoutConstraint(item: cancelButton, attribute: .centerX, relatedBy: .equal, toItem: bottomView, attribute: .centerX, multiplier: 0.5, constant: 0)
-            let centerCancelYConst = NSLayoutConstraint(item: cancelButton, attribute: .centerY, relatedBy: .equal, toItem: bottomView, attribute: .centerY, multiplier: 1, constant: 0)
-            bottomView.addConstraints([centerCancelXConst, centerCancelYConst])
-            cropCenterXMultiplier = 1.5
-        }
+        cancelButton.translatesAutoresizingMaskIntoConstraints = false
+        cancelButton.setTitle(cancelButtonText, for: .normal)
+        cancelButton.addTarget(self, action: #selector(cropCancel), for: .touchUpInside)
+        bottomView.addSubview(cancelButton)
+        let centerCancelXConst = NSLayoutConstraint(item: cancelButton, attribute: .centerX, relatedBy: .equal, toItem: bottomView, attribute: .centerX, multiplier: 0.5, constant: 0)
+        let centerCancelYConst = NSLayoutConstraint(item: cancelButton, attribute: .centerY, relatedBy: .equal, toItem: bottomView, attribute: .centerY, multiplier: 1, constant: 0)
+        bottomView.addConstraints([centerCancelXConst, centerCancelYConst])
+        cropCenterXMultiplier = 1.5
+
         cropButton.translatesAutoresizingMaskIntoConstraints = false
         cropButton.addTarget(self, action: #selector(cropDone), for: .touchUpInside)
         bottomView.addSubview(cropButton)
@@ -240,6 +231,15 @@ import UIKit
     
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+
+        if Locale.current.languageCode == "fr" {
+            cancelButtonText = "Annuler"
+            cropButtonText = "Valider"
+        }
+        else {
+            cancelButtonText = "Cancel"
+            cropButtonText = "Use Photo"
+        }
 
         self.cancelButton.setTitle(cancelButtonText, for: .normal)
         self.cropButton.setTitle(cropButtonText, for: .normal)
@@ -264,6 +264,15 @@ import UIKit
         } else {
             width = cropView.frame.width
             height = cropView.frame.width * imageRatio
+        }
+        let oversize: CGFloat = 1.05
+        if width < cropView.frame.width * oversize {
+            height *= cropView.frame.width * oversize / width
+            width = cropView.frame.width * oversize
+        }
+        if height < cropView.frame.height * oversize {
+            width *= cropView.frame.height * oversize / height
+            height = cropView.frame.height * oversize
         }
         let x = cropView.frame.origin.x + cropView.frame.width * 0.5 - width * 0.5
         let y = cropView.frame.origin.y + cropView.frame.height * 0.5 - height * 0.5
@@ -310,6 +319,10 @@ import UIKit
             self.endAppearanceTransition()
             self.view.removeFromSuperview()
             self.removeFromParentViewController()
+            if self.autoClosePicker {
+                self.picker?.dismiss(animated: true, completion: nil)
+            }
+            self.delegate?.didCancel?()
         }
     }
 
