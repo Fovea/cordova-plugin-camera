@@ -552,8 +552,9 @@ static NSString* toBase64(NSData* data) {
         cameraPicker.pickerPopoverController.delegate = nil;
         cameraPicker.pickerPopoverController = nil;
         invoke();
+    } else if (cropperController == nil) {
+        [[cameraPicker presentingViewController] dismissViewControllerAnimated:YES completion:invoke];
     } else {
-        // [[cameraPicker presentingViewController] dismissViewControllerAnimated:YES completion:invoke];
         invoke();
     }
 }
