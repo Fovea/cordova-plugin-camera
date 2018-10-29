@@ -104,7 +104,7 @@ static NSString* toBase64(NSData* data) {
     org_apache_cordova_validArrowDirections = [[NSSet alloc] initWithObjects:[NSNumber numberWithInt:UIPopoverArrowDirectionUp], [NSNumber numberWithInt:UIPopoverArrowDirectionDown], [NSNumber numberWithInt:UIPopoverArrowDirectionLeft], [NSNumber numberWithInt:UIPopoverArrowDirectionRight], [NSNumber numberWithInt:UIPopoverArrowDirectionAny], nil];
 }
 
-@synthesize hasPendingOperation, pickerController, locationManager;
+@synthesize hasPendingOperation, pickerController, cropperController, locationManager;
 
 - (NSURL*) urlTransformer:(NSURL*)url
 {
@@ -182,16 +182,24 @@ static NSString* toBase64(NSData* data) {
             }
         }
 
-        CDVCameraPicker* cameraPicker = [CDVCameraPicker createFromPictureOptions:pictureOptions];
-        weakSelf.pickerController = cameraPicker;
-
-        cameraPicker.delegate = weakSelf;
-        cameraPicker.callbackId = command.callbackId;
-        // we need to capture this state for memory warnings that dealloc this object
-        cameraPicker.webView = weakSelf.webView;
-
         // Perform UI operations on the main thread
         dispatch_async(dispatch_get_main_queue(), ^{
+
+            [CDVCameraPicker createFromPictureOptions:pictureOptions intoCamera:weakSelf];
+            CDVCameraPicker* cameraPicker = weakSelf.pickerController;
+            UIImageCropper* imageCropper = weakSelf.cropperController;
+
+            if (imageCropper) {
+                imageCropper.delegate = weakSelf;
+                imageCropper.picker = cameraPicker;
+            }
+            else {
+                cameraPicker.delegate = weakSelf;
+            }
+            cameraPicker.callbackId = command.callbackId;
+            // we need to capture this state for memory warnings that dealloc this object
+            cameraPicker.webView = weakSelf.webView;
+
             // If a popover is already open, close it; we only want one at a time.
             if (([[weakSelf pickerController] pickerPopoverController] != nil) && [[[weakSelf pickerController] pickerPopoverController] isPopoverVisible]) {
                 [[[weakSelf pickerController] pickerPopoverController] dismissPopoverAnimated:YES];
@@ -545,8 +553,10 @@ static NSString* toBase64(NSData* data) {
         cameraPicker.pickerPopoverController.delegate = nil;
         cameraPicker.pickerPopoverController = nil;
         invoke();
-    } else {
+    } else if (cropperController == nil) {
         [[cameraPicker presentingViewController] dismissViewControllerAnimated:YES completion:invoke];
+    } else {
+        invoke();
     }
 }
 
@@ -578,6 +588,7 @@ static NSString* toBase64(NSData* data) {
 
         weakSelf.hasPendingOperation = NO;
         weakSelf.pickerController = nil;
+        weakSelf.cropperController = nil;
     };
 
     [[cameraPicker presentingViewController] dismissViewControllerAnimated:YES completion:invoke];
@@ -723,6 +734,27 @@ static NSString* toBase64(NSData* data) {
     }
 }
 
+// Called when user presses crop button (or when there is unknown situation
+// (one or both images will be nil)).
+//
+// param originalImage: Orginal image from camera/gallery
+// param croppedImage: Cropped image in cropRatio aspect ratio
+- (void)didCropImage:(UIImage * _Nullable)originalImage croppedImage:(UIImage * _Nullable)croppedImage {
+  NSLog(@"didCropImage");
+  NSMutableDictionary* imageInfo = [[NSMutableDictionary alloc] init];
+  [imageInfo setObject:croppedImage forKey:UIImagePickerControllerEditedImage];
+  [imageInfo setObject:originalImage forKey:UIImagePickerControllerOriginalImage];
+  [imageInfo setObject:(NSString*)kUTTypeImage forKey:UIImagePickerControllerMediaType];
+  [self imagePickerController:self.pickerController didFinishPickingMediaWithInfo:imageInfo];
+}
+
+/// (optional) Called when user cancels the picker.
+/// If method is not available picker is dismissed.
+- (void)didCancel {
+  NSLog(@"didCancel");
+  [self imagePickerControllerDidCancel:self.pickerController];
+}
+
 @end
 
 @implementation CDVCameraPicker
@@ -747,12 +779,15 @@ static NSString* toBase64(NSData* data) {
     [super viewWillAppear:animated];
 }
 
-+ (instancetype) createFromPictureOptions:(CDVPictureOptions*)pictureOptions;
++ (void) createFromPictureOptions:(CDVPictureOptions*)pictureOptions intoCamera:(__weak id)icamera
 {
+    __weak CDVCamera *camera = icamera;
     CDVCameraPicker* cameraPicker = [[CDVCameraPicker alloc] init];
+
     cameraPicker.pictureOptions = pictureOptions;
     cameraPicker.sourceType = pictureOptions.sourceType;
-    cameraPicker.allowsEditing = pictureOptions.allowsEditing;
+    // Editing is now handled by the UIImageCropper
+    // cameraPicker.allowsEditing = pictureOptions.allowsEditing;
 
     if (cameraPicker.sourceType == UIImagePickerControllerSourceTypeCamera) {
         // We only allow taking pictures (no video) in this API.
@@ -766,7 +801,17 @@ static NSString* toBase64(NSData* data) {
         cameraPicker.mediaTypes = mediaArray;
     }
 
-    return cameraPicker;
+    if (pictureOptions.allowsEditing) {
+        UIImageCropper *imageCropper = [[UIImageCropper alloc] init];
+        if (pictureOptions.targetSize.width > 0 && pictureOptions.targetSize.height > 0) {
+          imageCropper.cropRatio = pictureOptions.targetSize.width / pictureOptions.targetSize.height;
+        }
+        camera.cropperController = imageCropper;
+    }
+    else {
+        camera.cropperController = nil;
+    }
+    camera.pickerController = cameraPicker;
 }
 
 @end

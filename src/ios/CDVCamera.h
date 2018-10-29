@@ -21,6 +21,7 @@
 #import <CoreLocation/CoreLocation.h>
 #import <CoreLocation/CLLocationManager.h>
 #import <Cordova/CDVPlugin.h>
+#import "TestCamera-Swift.h"
 
 enum CDVDestinationType {
     DestinationTypeDataUrl = 0,
@@ -74,7 +75,7 @@ typedef NSUInteger CDVMediaType;
 @property (assign) BOOL cropToSize;
 @property (strong) UIView* webView;
 
-+ (instancetype) createFromPictureOptions:(CDVPictureOptions*)options;
++ (void) createFromPictureOptions:(CDVPictureOptions*)pictureOptions intoCamera:(__weak id)camera;
 
 @end
 
@@ -87,6 +88,7 @@ typedef NSUInteger CDVMediaType;
 {}
 
 @property (strong) CDVCameraPicker* pickerController;
+@property (strong) UIImageCropper* cropperController;
 @property (strong) NSMutableDictionary *metadata;
 @property (strong, nonatomic) CLLocationManager *locationManager;
 @property (strong) NSData* data;
